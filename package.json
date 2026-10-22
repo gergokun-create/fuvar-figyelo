@@ -5,7 +5,7 @@
   "description": "Fuvar Figyelő – kézi fuvarkövetés emlékeztetőkkel és push értesítéssel",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test \"tests/*.test.js\"",
     "samples": "node scripts/make-samples.mjs",
     "serve": "node scripts/serve.mjs"
   },
