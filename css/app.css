@@ -12,6 +12,8 @@
   --warn-soft: #fff3dc;
   --bad: #b91c1c;
   --bad-soft: #fde8e8;
+  --fel: #7e22ce;
+  --fel-soft: #f3e8ff;
   --info-soft: #e8f1fb;
   --chg: #fff1a8;
   --radius: 12px;
@@ -22,7 +24,7 @@
   :root {
     --bg: #0f141c; --card: #18202c; --text: #e6ebf3; --muted: #95a3b8; --line: #2a3546;
     --brand: #6b9bff; --brand-soft: #1d2a45; --ok: #4ade80; --ok-soft: #15301f; --warn: #fbbf24; --warn-soft: #3a2c10;
-    --bad: #f87171; --bad-soft: #3b1818; --info-soft: #172537; --chg: #5a4b08; --shadow: none;
+    --bad: #f87171; --bad-soft: #3b1818; --fel: #c084fc; --fel-soft: #2e1a42; --info-soft: #172537; --chg: #5a4b08; --shadow: none;
     color-scheme: dark;
   }
 }
@@ -94,6 +96,7 @@ input[type=radio], input[type=checkbox] { min-height: 0; width: 18px; height: 18
 
 .chip { display: inline-block; padding: .1rem .55rem; border-radius: 99px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .s-terv { background: var(--info-soft); color: var(--brand); }
+.s-fel { background: var(--fel-soft); color: var(--fel); }
 .s-uton { background: var(--warn-soft); color: var(--warn); }
 .s-le { background: var(--ok-soft); color: var(--ok); }
 .s-prob { background: var(--bad-soft); color: var(--bad); }

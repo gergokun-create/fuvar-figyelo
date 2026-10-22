@@ -5,6 +5,7 @@ import { normText, hash } from './text.js';
 
 export const STATUSZOK = {
   tervezett: 'Tervezett',
+  felrakon: 'Felrakón',
   uton: 'Úton',
   lerakva: 'Lerakva',
   problema: 'Probléma',

@@ -123,7 +123,7 @@ felrakás dátuma. A jegyzeteidet, státuszt, ránézéseket és a naplót a fel
 
 **Napok:** Lejárt, de nincs lerakva / Ma / Holnap / későbbi napok, keresés és szűrés fuvarozóra, megbízóra, státuszra.
 
-**Fuvar:** státusz (Tervezett / Úton / Lerakva / Probléma), ránézés gyorsgombokkal (+1, +2, +4 óra, holnap 8:00) vagy
+**Fuvar:** státusz (Tervezett / Felrakón / Úton / Lerakva / Probléma), ránézés gyorsgombokkal (+1, +2, +4 óra, holnap 8:00) vagy
 egyedi időponttal, jegyzet, időrendi napló. Lerakott vagy archivált fuvarhoz nem megy ki emlékeztető.
 
 **Értesítések:** a ránézések a beállított időben; reggel 7:30-kor összesítő a mai lerakókról; 17:00-kor a holnapiakról

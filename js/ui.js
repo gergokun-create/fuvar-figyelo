@@ -45,4 +45,4 @@ export function debounce(fn, ms = 200) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
-export const STATUS_CLASS = { tervezett: 's-terv', uton: 's-uton', lerakva: 's-le', problema: 's-prob' };
+export const STATUS_CLASS = { tervezett: 's-terv', felrakon: 's-fel', uton: 's-uton', lerakva: 's-le', problema: 's-prob' };
