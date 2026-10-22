@@ -150,3 +150,85 @@ test('GitHub kliens: 409 ütközésnél újraolvas, újra alkalmazza a módosít
   assert.deepEqual(remote.data.items, ['a', 'masik', 'enyem'], 'mindkét módosítás megmarad');
   assert.equal(out.sha, 'sha3');
 });
+
+// --- ntfy időzítés és visszavonás ---
+import { planNtfy } from '../js/core/schedule.js';
+import { seqFor } from '../js/core/ntfy.js';
+
+test('planNtfy: 3 napon belüli ránézést beütemez, távolabbit és beütemezettet nem', () => {
+  const now = new Date('2026-10-22T08:00:00Z');
+  const f = trip('A', '2026-10-23', { emlekeztetok: [
+    { id: 'e1', at: '2026-10-22T10:00:00Z' },                       // 2 óra múlva -> igen
+    { id: 'e2', at: '2026-10-27T10:00:00Z' },                       // 5 nap múlva -> majd később
+    { id: 'e3', at: '2026-10-22T11:00:00Z', ntfy: { seq: 'x' } },   // már beütemezve
+    { id: 'e4', at: '2026-10-22T07:00:00Z' },                       // múltbeli -> computeDue pótolja
+  ] });
+  const p = planNtfy({ data: dataOf(f), now, settings: { reggeliOsszesito: '07:30', estiOsszesito: '17:00' } });
+  const rem = p.publish.filter((x) => x.reminder);
+  assert.deepEqual(rem.map((x) => x.emlId), ['e1']);
+  assert.equal(rem[0].seq, seqFor('e:A:e1'));
+  assert.equal(rem[0].at, '2026-10-22T10:00:00Z');
+  assert.deepEqual(p.cancel, []);
+  // múltbeli, be nem ütemezett: azonnali pótlás
+  assert.ok(computeDue({ data: dataOf(f), now, summaries: false }).some((d) => d.kulcs === 'e:A:e4'));
+  assert.ok(!computeDue({ data: dataOf(f), now: new Date('2026-10-22T12:00:00Z'), summaries: false }).some((d) => d.kulcs === 'e:A:e3'),
+    'a beütemezettet az ntfy kézbesíti, nem küldjük újra');
+});
+
+test('planNtfy: lemondott, lerakott és archivált fuvar beütemezett ránézését visszavonja', () => {
+  const now = new Date('2026-10-22T08:00:00Z');
+  const sch = { ntfy: { seq: 's' } };
+  const data = dataOf(
+    trip('A', '2026-10-23', { emlekeztetok: [{ id: 'e1', at: '2026-10-22T12:00:00Z', torolve: 'x', ...sch }] }),
+    trip('B', '2026-10-23', { statusz: 'lerakva', emlekeztetok: [{ id: 'e2', at: '2026-10-22T12:00:00Z', ...sch }] }),
+    trip('C', '2026-10-23', { archivalt: true, emlekeztetok: [{ id: 'e3', at: '2026-10-22T12:00:00Z', lemondva: 'x', ...sch }] }),
+    trip('D', '2026-10-23', { emlekeztetok: [{ id: 'e4', at: '2026-10-22T12:00:00Z', torolve: 'x', ...sch, ntfyVisszavonva: 'x' }] }),
+    trip('E', '2026-10-23', { emlekeztetok: [{ id: 'e5', at: '2026-10-22T12:00:00Z', torolve: 'x' }] }), // sosem volt beütemezve
+    trip('F', '2026-10-23', { emlekeztetok: [{ id: 'e6', at: '2026-10-22T06:00:00Z', torolve: 'x', ...sch }] }), // már kézbesült
+  );
+  // az ütemező által beütemezett is visszavonódik
+  const data2 = dataOf(trip('G', '2026-10-23', { statusz: 'lerakva', emlekeztetok: [{ id: 'e7', at: '2026-10-22T12:00:00Z' }] }));
+  const p = planNtfy({ data, now });
+  assert.deepEqual(p.cancel.map((c) => c.kulcs).sort(), ['e:A:e1', 'e:B:e2', 'e:C:e3']);
+  assert.ok(p.publish.every((x) => !x.reminder));
+  const p2 = planNtfy({ data: data2, now, sent: { 'e:G:e7': { allapot: 'utemezve' } } });
+  assert.deepEqual(p2.cancel.map((c) => c.seq), [seqFor('e:G:e7')]);
+  assert.deepEqual(planNtfy({ data: data2, now, sent: { 'e:G:e7': { allapot: 'visszavonva' } } }).cancel, []);
+});
+
+test('planNtfy: összesítők a következő 3 napra, helyi idő szerint, vasárnap nélkül, DST-váltáson át', () => {
+  // csütörtök 2026.10.22. 09:00 helyi; a vasárnapi (25.) váltás után 7:30 = 06:30 UTC
+  const p = planNtfy({ data: dataOf(trip('A', '2026-10-23')), now: new Date('2026-10-22T07:00:00Z') });
+  const s = Object.fromEntries(p.publish.filter((x) => !x.reminder).map((x) => [x.kulcs, x.at]));
+  assert.deepEqual(Object.keys(s), ['este:2026-10-22', 'reggel:2026-10-23', 'este:2026-10-23', 'reggel:2026-10-24', 'este:2026-10-24']);
+  assert.equal(s['este:2026-10-22'], '2026-10-22T15:00:00.000Z');
+  assert.equal(s['reggel:2026-10-24'], '2026-10-24T05:30:00.000Z');
+  const later = planNtfy({ data: dataOf(), now: new Date('2026-10-23T12:00:00Z') });
+  const at = Object.fromEntries(later.publish.map((x) => [x.kulcs, x.at]));
+  assert.equal(at['reggel:2026-10-26'], '2026-10-26T06:30:00.000Z', 'téli időben 7:30 = 06:30 UTC');
+  assert.ok(!Object.keys(at).some((k) => k.endsWith('2026-10-25')), 'vasárnap nincs összesítő');
+});
+
+test('ütemező ntfy-jal: beütemez, visszavon, feljegyez; másodszor nem ütemez újra', async () => {
+  const now = new Date('2026-10-22T05:30:00Z');
+  const data = dataOf(
+    trip('A', '2026-10-23', { emlekeztetok: [{ id: 'e1', at: '2026-10-24T09:00:00Z' }] }),
+    trip('B', '2026-10-23', { statusz: 'lerakva', emlekeztetok: [{ id: 'e2', at: '2026-10-22T09:00:00Z', ntfy: { seq: 'x' } }] }),
+  );
+  const client = fakeRepo({ 'data/fuvarok.json': data, 'data/beallitasok.json': {} });
+  const calls = [];
+  const ntfy = { name: 'ntfy', publish: async (m) => calls.push(['pub', m.kulcs]), cancel: async (s) => calls.push(['del', s]), send: async (m) => calls.push(['send', m.kulcs]) };
+  const r = await run({ env: {}, now, client, notifiers: [ntfy], log: () => {} });
+  assert.equal(r.scheduled, 1);
+  assert.equal(r.cancelled, 1);
+  assert.ok(calls.some((c) => c[0] === 'pub' && c[1] === 'e:A:e1'));
+  assert.ok(calls.some((c) => c[0] === 'del' && c[1] === seqFor('e:B:e2')));
+  assert.ok(!calls.some((c) => c[0] === 'send'), 'az ntfy-ra nem megy közvetlen összesítő');
+  const st = client.store['state/elkuldve.json'].data.elkuldve;
+  assert.equal(st['e:A:e1'].allapot, 'utemezve');
+  assert.equal(st['e:B:e2'].allapot, 'visszavonva');
+  calls.length = 0;
+  const r2 = await run({ env: {}, now: new Date('2026-10-22T15:00:00Z'), client, notifiers: [ntfy], log: () => {} });
+  assert.equal(r2.scheduled, 0);
+  assert.equal(r2.cancelled, 0);
+});

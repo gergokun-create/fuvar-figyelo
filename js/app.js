@@ -5,6 +5,7 @@ import * as feltoltes from './views/feltoltes.js';
 import * as fuvar from './views/fuvar.js';
 import * as archivum from './views/archivum.js';
 import * as beallitasok from './views/beallitasok.js';
+import { startNtfySync } from './notify.js';
 
 const view = document.getElementById('view');
 const statusEl = document.getElementById('sync-status');
@@ -66,6 +67,7 @@ setInterval(() => { if (!editing() && ['napok', 'fuvar'].includes(route().name))
 
 render();
 loadAll();
+startNtfySync();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

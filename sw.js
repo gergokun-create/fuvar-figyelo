@@ -1,10 +1,10 @@
 // Service worker: az app héja offline is betölt. A GitHub API-t soha nem gyorsítótárazzuk.
-const VERSION = 'ff-v1';
+const VERSION = 'ff-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
-  'js/app.js', 'js/store.js', 'js/ui.js', 'js/format.js',
+  'js/app.js', 'js/store.js', 'js/notify.js', 'js/ui.js', 'js/format.js',
   'js/core/text.js', 'js/core/tz.js', 'js/core/dates.js', 'js/core/tabular.js', 'js/core/detect.js', 'js/core/records.js',
-  'js/core/sync.js', 'js/core/schedule.js', 'js/core/github.js',
+  'js/core/sync.js', 'js/core/schedule.js', 'js/core/github.js', 'js/core/ntfy.js',
   'js/views/napok.js', 'js/views/feltoltes.js', 'js/views/fuvar.js', 'js/views/archivum.js', 'js/views/beallitasok.js',
 ];
 const SHEETJS = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';

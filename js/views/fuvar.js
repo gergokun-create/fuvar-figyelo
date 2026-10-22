@@ -2,7 +2,7 @@
 import { h, mount, toast, STATUS_CLASS } from '../ui.js';
 import { state, mutate } from '../store.js';
 import { STATUSZOK } from '../core/sync.js';
-import { quickTimes, remindersBlocked, activeReminders, reminderKey } from '../core/schedule.js';
+import { quickTimes, remindersBlocked, activeReminders, reminderKey, isScheduled } from '../core/schedule.js';
 import { zonedToUtc, localParts, huDateTimeShort } from '../core/tz.js';
 import { randomId } from '../core/text.js';
 import { placeText } from '../core/records.js';
@@ -117,13 +117,17 @@ export function render(root, id) {
           const [d, t] = custom.value.split('T');
           remind(zonedToUtc(d, t.slice(0, 5)).toISOString());
         } }, 'Egyedi időpont beállítása')),
-      h('p', { class: 'muted small' }, 'Az időpontok Budapest helyi ideje szerint értendők. A GitHub ütemező 5–15 percet késhet.'),
+      h('p', { class: 'muted small' }, 'Az időpontok Budapest helyi ideje szerint értendők. A ránézést az ntfy pontos időre kapja; ha törlöd, vagy a fuvar Lerakva / archivált lesz, visszavonom.'),
       rems.length ? h('div', {}, h('h3', {}, 'Beállított ránézések'), rems.map((e) => {
-        const sent = sentMap[reminderKey(f, e)];
+        const s = sentMap[reminderKey(f, e)];
+        const scheduled = isScheduled(f, e, sentMap);
+        const past = new Date(e.at) <= now;
+        const sent = (s && s.allapot !== 'utemezve') || (scheduled && past);
+        const chip = (cls, t) => h('span', { class: `chip ${cls}`, style: { marginLeft: '.4rem' } }, t);
         return h('div', { class: 'rem' },
           h('div', {}, h('b', { class: 'mono' }, whenText(e.at)), e.jegyzet ? ` – ${e.jegyzet}` : '',
-            sent ? h('span', { class: 'chip s-le', style: { marginLeft: '.4rem' } }, 'elküldve')
-              : new Date(e.at) <= now ? h('span', { class: 'chip s-uton', style: { marginLeft: '.4rem' } }, 'küldésre vár') : null),
+            sent ? chip('s-le', 'elküldve') : scheduled ? chip('s-terv', 'beütemezve')
+              : past ? chip('s-uton', 'küldésre vár') : chip('s-uton', 'ütemezésre vár')),
           sent ? null : h('button', { class: 'ghost danger', onclick: () => deleteReminder(id, e.id), 'aria-label': 'Törlés' }, 'Törlés'));
       })) : null,
       past.length ? h('details', {}, h('summary', { class: 'small' }, `Törölt / megszűnt ránézések (${past.length})`),

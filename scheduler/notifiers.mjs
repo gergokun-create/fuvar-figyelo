@@ -1,24 +1,13 @@
 // Cserélhető értesítő modulok. Mindegyik: { name, send({cim, uzenet, link, tipus}) }.
 // A környezeti változók alapján az összes beállított értesítőn kimegy az üzenet.
 
-export function ntfy({ topic, server = 'https://ntfy.sh', fetchImpl = fetch }) {
-  return {
-    name: 'ntfy',
-    async send({ cim, uzenet, link, tipus }) {
-      // JSON-közzététel: így az ékezetes cím is gond nélkül átmegy
-      const res = await fetchImpl(server.replace(/\/$/, '') + '/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic, title: cim, message: uzenet,
-          ...(link ? { click: link, actions: [{ action: 'view', label: 'Megnyitás', url: link }] } : {}),
-          tags: [tipus === 'emlekezteto' ? 'alarm_clock' : tipus === 'teszt' ? 'white_check_mark' : 'truck'],
-          priority: tipus === 'emlekezteto' ? 4 : 3,
-        }),
-      });
-      if (!res.ok) throw new Error(`ntfy HTTP ${res.status}`);
-    },
-  };
+import { createNtfy } from '../js/core/ntfy.js';
+
+/** ntfy: azonnali küldés (send) mellett időzít (publish + at) és visszavon (cancel). */
+export function ntfy({ topic, server, fetchImpl = fetch }) {
+  const c = createNtfy({ topic, server, fetchImpl });
+  // azonnali küldésnél ne cserélje le az időzítettet: seq és at nélkül megy
+  return { ...c, send: ({ cim, uzenet, link, tipus }) => c.publish({ cim, uzenet, link, tipus }) };
 }
 
 export function telegram({ token, chatId, fetchImpl = fetch }) {

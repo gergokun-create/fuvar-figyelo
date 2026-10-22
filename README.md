@@ -25,8 +25,13 @@ az app felismeri a formátumát, megmutatja a változásokat, és push értesít
 
 - A feltöltött Excel-fájlt **nem tároljuk**, csak a feldolgozott adatot.
 - Az app sha-val ír; ha közben más is írt (409), újraolvas, a módosítást újra alkalmazza, és újraír.
-- Az ütemező minden értesítést küldés előtt lefoglal, így semmi nem megy ki kétszer; a kimaradt futások
-  esedékes elemeit a következő futás pótolja. A naplóba nem ír fuvaradatot.
+- **Push időzítve, Actions-futás nélkül:** amikor ránézést állítasz be, az app azonnal beütemezi az ntfy-ba
+  a pontos időpontra (ntfy *scheduled delivery*, egyedi `sequence_id`-val). Ha a ránézést törlöd, vagy a fuvar
+  Lerakva státuszú / archivált lesz, az app **visszavonja** a még ki nem kézbesített üzenetet (DELETE).
+  A reggeli és esti összesítőket is így ütemezi be a következő 3 napra, és minden változáskor frissíti a tartalmukat.
+- A GitHub Actions ütemező csak **biztonsági háló** (napi 4 futás): beütemezi a 3 napnál távolabbi ránézéseket,
+  amikor már 3 napon belülre kerülnek, visszavonja, amit az app nem tudott, és azonnal elküldi a lekésetteket.
+  Semmi nem megy ki kétszer; a naplóba nem ír fuvaradatot.
 
 ---
 
@@ -57,8 +62,7 @@ Branch = **main**, mappa = **/ (root)** → Save. Pár perc múlva elérhető: `
 2. *Token name*: `fuvar-figyelo`, *Expiration*: pl. 1 év (lejárat előtt a GitHub e-mailben szól).
 3. *Repository access*: **Only select repositories** → `fuvar-figyelo-data`.
 4. *Permissions → Repository permissions*:
-   - **Contents: Read and write** (adatok olvasása/írása)
-   - **Actions: Read and write** (csak a „Teszt push küldése” gombhoz kell)
+   - **Contents: Read and write** (adatok olvasása/írása) – más jog nem kell
    - (a *Metadata: Read-only* automatikusan bekerül)
 5. **Generate token**, másold ki (`github_pat_…`).
 6. Nyisd meg az appot → **Beállítások** → tulajdonos: a GitHub-felhasználóneved, repó: `fuvar-figyelo-data`,
@@ -75,13 +79,16 @@ Ha egy eszköz elveszik: a GitHubon töröld a tokent, és csinálj újat.
    ```
 2. `fuvar-figyelo-data` → **Settings → Secrets and variables → Actions → New repository secret**:
    név `NTFY_TOPIC`, érték a topicnév.
+3. Az appban: **Beállítások → Push értesítés (ntfy)** → ugyanaz a topicnév → **Topic mentése**. Ezzel ütemezi be az
+   app a ránézéseket pontos időre. (Csak abban a böngészőben tárolódik, ahol megadod; minden eszközön add meg.)
 
 ### 5. Az ntfy app telepítése és feliratkozás
 
 1. Telepítsd az **ntfy** appot: Android – Google Play / F-Droid, iPhone – App Store („ntfy”).
 2. Az appban **+ (Subscribe to topic)** → írd be ugyanazt a topicnevet → szerver: `ntfy.sh` (alapértelmezett) → Subscribe.
 3. Androidon érdemes az ntfy-nál kikapcsolni az akkumulátor-optimalizálást, hogy késés nélkül jöjjenek az értesítések.
-4. A Fuvar Figyelő **Beállítások → 🔔 Teszt push küldése** gombjával próbáld ki (1–2 perc, amíg az Actions elindul).
+4. A Fuvar Figyelő **Beállítások → 🔔 Teszt push küldése** gombjával próbáld ki (pár másodperc). Az ütemező
+   workflow-t az Actions fülön kézzel is elindíthatod („Run workflow”, *Teszt push küldése* bepipálva).
 
 > Az ntfy.sh nyilvános szolgáltatás: az értesítés szövege (rendszám, megbízó, jegyzet) átmegy rajta. Ha ez nem fér bele,
 > használd a Telegramot, vagy saját ntfy-szervert (`NTFY_SERVER` secret).
@@ -91,7 +98,8 @@ Ha egy eszköz elveszik: a GitHubon töröld a tokent, és csinálj újat.
 1. Telegramban írj a **@BotFather**-nek: `/newbot` → kapsz egy tokent → secret: `TELEGRAM_BOT_TOKEN`.
 2. Írj egy üzenetet az új botodnak, majd nyisd meg: `https://api.telegram.org/bot<TOKEN>/getUpdates` – a
    `"chat":{"id": …}` szám a chat-azonosító → secret: `TELEGRAM_CHAT_ID`.
-3. Ha mindkét értesítő be van állítva, mindkettőre kimegy az üzenet.
+3. A Telegram nem tud időzített kézbesítést, ezért oda csak az ütemező futásaikor megy üzenet: a reggeli és esti
+   összesítő (7:30 / 17:00 körül), és a lekésett, ntfy-ba be nem ütemezett ránézések. Pontos idejű ránézéshez az ntfy kell.
 
 ### 7. Telepítés a kezdőképernyőre
 
@@ -123,26 +131,30 @@ egyedi időponttal, jegyzet, időrendi napló. Lerakott vagy archivált fuvarhoz
 
 ## Ütemezés és Actions-percek
 
-A GitHub cron UTC-ben fut, ezért úgy választottam, hogy nyári és téli időben is lefedje a helyi 5–21 órát;
-a szkript Budapest helyi ideje szerint dönt.
+A pontos idejű értesítést az **ntfy** végzi (időzített kézbesítés, legfeljebb 3 nappal előre), ezért nem kell
+sűrűn futó GitHub-ütemező. A ránézés a beállított percben érkezik, nincs GitHub-késés.
 
-| Cron (UTC) | Futás/nap | Helyi idő nyáron (UTC+2) | Helyi idő télen (UTC+1) |
-|---|---|---|---|
-| `0,15,30,45 5-16 * * 1-6` | 48 | 7:00–18:45, 15 percenként | 6:00–17:45, 15 percenként |
-| `0 3,4,17,18,19,20 * * 1-6` | 6 | 5, 6, 19, 20, 21, 22 óra | 4, 5, 18, 19, 20, 21 óra |
+A biztonsági háló naponta 4-szer fut, hétfőtől szombatig. A cron UTC-ben van, ezért mindkét összesítő-időpontnál
+két futás van (nyári és téli idő):
 
-**Számítás:** minden futás kb. 10–20 másodperc, de a GitHub percre felfelé kerekít → 1 perc/futás.
-54 futás × átlag 26 munkanap (hétfő–szombat) ≈ **1404 perc/hó**; a legrosszabb hónapban (27 nap) **1458 perc** –
-a 2000 ingyenes percből bő 500 perc tartalék marad (teszt pushokra és egyéb privát workflow-kra). A nyilvános
-`fuvar-figyelo` repó tesztjei nem fogyasztanak percet.
+| Cron (UTC) | Helyi idő nyáron | Helyi idő télen |
+|---|---|---|
+| `30 5,6 * * 1-6` | 7:30 és 8:30 | 6:30 és 7:30 |
+| `0 15,16 * * 1-6` | 17:00 és 18:00 | 16:00 és 17:00 |
 
-Ha végig 15 percenként futna 5–21 óra között (DST miatt 3–20 UTC), az napi 72 futás ≈ 1870 perc/hó lenne – ez már
-túl közel a kerethez, ezért a reggeli/esti széleken óránként fut.
+**Számítás:** 4 futás/nap × 1 perc (a GitHub percre kerekít) × átlag 26 munkanap ≈ **104 perc/hó**
+(legrosszabb hónap: 108 perc) – a 2000 ingyenes perc kb. 5%-a. (A korábbi, 15 percenkénti változat ~1400 perc lett volna.)
 
-**Fontos:** a GitHub ütemezett futásai csúcsidőben **5–15 percet késhetnek**, ritkán egy-egy futás ki is maradhat.
-Ezért egy 14:00-ra állított ránézés jellemzően 14:00 és 14:30 között érkezik. Vasárnap nincs futás; a vasárnapra
-állított ránézések hétfő reggel mennek ki.
+Mit csinál egy futás:
+- beütemezi az ntfy-ba azokat a ránézéseket, amelyek most kerültek 3 napon belülre, vagy amelyeket az app nem tudott
+  (pl. nem volt megadva a topic);
+- visszavonja a lemondott / lerakott / archivált fuvarok még ki nem kézbesített ránézéseit (ha az app nem tette meg);
+- frissíti a következő napok összesítőit, és azonnal elküldi a lekésett, sehová be nem ütemezett ránézéseket;
+- Telegramra elküldi az esedékes összesítőt.
 
+**Korlát:** a GitHub ütemezett futásai 5–15 percet késhetnek – ez most csak a biztonsági hálót és a Telegramot érinti.
+Ha egy ránézést úgy állítasz be, hogy az app nem éri el az ntfy-t (nincs internet), az app 1 perc múlva újrapróbálja;
+ha addig bezárod, a következő ütemező-futás pótolja.
 ## Fejlesztés
 
 ```bash

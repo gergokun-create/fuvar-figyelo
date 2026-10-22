@@ -1,7 +1,8 @@
 // Beállítások: GitHub-kapcsolat, összesítők időpontja, teszt push, formátumok, feltöltési napló.
 import { h, mount, select, toast } from '../ui.js';
-import { state, mutate, saveConfig, loadAll, testConnection, sendTestPush, remoteEnabled, humanError,
+import { state, mutate, saveConfig, loadAll, testConnection, remoteEnabled, humanError,
   pushLocalIfRemoteEmpty, forgetToken } from '../store.js';
+import { sendTestPush, ntfyState, syncNtfy } from '../notify.js';
 import { FIELDS, columnKeys } from '../core/detect.js';
 import { DEFAULT_SETTINGS } from '../core/schedule.js';
 import { uploadLogTable } from './feltoltes.js';
@@ -39,7 +40,28 @@ export function render(root) {
   const morning = h('input', { type: 'time', value: st.reggeliOsszesito });
   const evening = h('input', { type: 'time', value: st.estiOsszesito });
 
+  const topic = h('input', { type: 'password', value: c.ntfyTopic || '', placeholder: 'fuvar-…', autocomplete: 'off' });
+
   mount(root,
+    h('section', { class: 'card stack' },
+      h('h2', {}, 'Push értesítés (ntfy)'),
+      c.ntfyTopic
+        ? h('div', { class: `alert ${ntfyState.hiba ? 'bad' : 'ok'}` }, ntfyState.hiba
+          ? 'ntfy hiba: ' + ntfyState.hiba
+          : 'Bekapcsolva: a ránézéseket és az összesítőket az app pontos időre beütemezi az ntfy-ba, a lemondottakat visszavonja.')
+        : h('div', { class: 'alert warn' }, 'Add meg az ntfy topicot (ugyanazt, mint az NTFY_TOPIC secret és az ntfy appban), különben a ránézések csak a napi ütemező-futáskor mennek ki.'),
+      h('label', { class: 'field' }, 'ntfy topic', topic),
+      h('div', { class: 'row' },
+        h('button', { class: 'primary', onclick: () => {
+          saveConfig({ ntfyTopic: topic.value.trim() });
+          syncNtfy(); toast('Topic mentve', 'ok'); rerender();
+        } }, 'Topic mentése'),
+        h('button', { disabled: !c.ntfyTopic, onclick: async () => {
+          try { await sendTestPush(); toast('Teszt push elküldve – pár másodpercen belül megérkezik.', 'ok'); }
+          catch (e) { toast('Nem sikerült: ' + humanError(e), 'error'); }
+        } }, '🔔 Teszt push küldése')),
+      h('p', { class: 'muted small' }, 'A topic csak ebben a böngészőben tárolódik. Aki ismeri, olvashatja az értesítéseidet – legyen hosszú és véletlenszerű.')),
+
     h('section', { class: 'card stack' },
       h('h2', {}, 'GitHub-kapcsolat (privát adat-repó)'),
       remoteEnabled()
@@ -51,7 +73,7 @@ export function render(root) {
         h('label', { class: 'field' }, 'Privát adat-repó', repo),
         h('label', { class: 'field' }, 'Ág', branch),
         h('label', { class: 'field' }, 'Fine-grained token', token)),
-      h('p', { class: 'muted small' }, 'A token csak ebben a böngészőben (localStorage) tárolódik. Jogosultság: csak a fuvar-figyelo-data repó, Contents: Read and write, Actions: Read and write (a teszt push gombhoz).'),
+      h('p', { class: 'muted small' }, 'A token csak ebben a böngészőben (localStorage) tárolódik. Jogosultság: csak a fuvar-figyelo-data repó, Contents: Read and write.'),
       h('div', { class: 'row' },
         h('button', { class: 'primary', onclick: connect }, 'Mentés és kapcsolódás'),
         remoteEnabled() ? h('button', { onclick: async () => { await loadAll(); toast('Frissítve', 'ok'); } }, 'Adatok újratöltése') : null,
@@ -69,12 +91,8 @@ export function render(root) {
           const a = morning.value || DEFAULT_SETTINGS.reggeliOsszesito, b = evening.value || DEFAULT_SETTINGS.estiOsszesito;
           mutate('settings', (d) => ({ ...d, reggeliOsszesito: a, estiOsszesito: b }), 'Összesítők időpontja');
           toast('Időpontok mentve', 'ok');
-        } }, 'Időpontok mentése'),
-        h('button', { disabled: !remoteEnabled(), onclick: async () => {
-          try { await sendTestPush(); toast('Teszt elindítva – 1–2 percen belül megérkezik a push.', 'ok'); }
-          catch (e) { toast('Nem sikerült elindítani: ' + humanError(e) + ' (Actions: Read and write jog kell.)', 'error'); }
-        } }, '🔔 Teszt push küldése')),
-      h('p', { class: 'muted small' }, 'Az ütemező hétfőtől szombatig kb. 5 és 21 óra között fut. A GitHub ütemezett futásai 5–15 percet késhetnek.')),
+        } }, 'Időpontok mentése')),
+      h('p', { class: 'muted small' }, 'Az összesítők hétfőtől szombatig jönnek. Az ntfy pontos időben kézbesít; a GitHub ütemező csak biztonsági háló (naponta 4 futás).')),
 
     formatsCard(rerender),
 

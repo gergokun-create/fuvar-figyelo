@@ -114,10 +114,6 @@ export async function testConnection(cfg) {
   return c.checkAccess();
 }
 
-export async function sendTestPush() {
-  await client().dispatchWorkflow('utemezo.yml', { teszt: 'true' });
-}
-
 export function humanError(e) {
   if (!e) return '';
   if (e.status === 401) return 'Érvénytelen vagy lejárt token (401).';
