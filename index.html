@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fuvar Figyelő</title>
+  <meta name="description" content="Kézi fuvarkövetés emlékeztetőkkel és push értesítéssel">
+  <meta name="theme-color" content="#1d4ed8">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.sheetjs.com; connect-src 'self' https://api.github.com https://cdn.sheetjs.com; img-src 'self' data:; style-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fuvar Figyelő">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/napok">
+      <img src="icons/icon.svg" alt="" width="28" height="28">
+      <span>Fuvar Figyelő</span>
+    </a>
+    <span id="sync-status" class="sync" title="Mentési állapot"></span>
+  </header>
+  <nav class="tabs" id="tabs">
+    <a href="#/napok" data-tab="napok">Napok</a>
+    <a href="#/feltoltes" data-tab="feltoltes">Feltöltés</a>
+    <a href="#/archivum" data-tab="archivum">Archívum</a>
+    <a href="#/beallitasok" data-tab="beallitasok">Beállítások</a>
+  </nav>
+  <main id="view" tabindex="-1"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

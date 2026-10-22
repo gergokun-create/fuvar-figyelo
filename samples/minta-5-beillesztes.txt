@@ -1,0 +1,3 @@
+Ref	Rendszám	Carrier	Ügyfél	Loading	Delivery date	Lerakó
+P-1	TSV-101	Paste Kft.	Kappa Zrt.	2026.10.22	2026.10.23 08:00-10:00	Budapest
+P-2	TSV-102	Paste Kft.	Kappa Zrt.	2026.10.22	2026.10.27	Szeged

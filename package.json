@@ -1,0 +1,18 @@
+{
+  "name": "fuvar-figyelo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fuvar Figyelő – kézi fuvarkövetés emlékeztetőkkel és push értesítéssel",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/",
+    "samples": "node scripts/make-samples.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}
