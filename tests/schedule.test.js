@@ -48,8 +48,8 @@ test('reggeli összesítő 7:30-tól, téli és nyári időben is helyi idő sze
   // 7:40 helyi = 05:40 UTC -> igen
   const due = computeDue({ data, now: new Date('2026-10-22T05:40:00Z') });
   assert.deepEqual(kinds(due), ['reggel:2026-10-22']);
-  assert.match(due[0].cim, /Mai lerakók \(1\)/);
-  assert.match(due[0].uzenet, /Lejárt, de nincs lerakva: 1/);
+  assert.match(due[0].cim, /^Ma: 1 lerakás – /);
+  assert.match(due[0].uzenet, /Lejárt, de nincs lerakva \(1\):/);
   // téli idő (2026.10.26.): 7:40 helyi = 06:40 UTC; 05:40 UTC = 6:40 helyi -> még nem
   const w = dataOf(trip('A', '2026-10-26'));
   assert.deepEqual(kinds(computeDue({ data: w, now: new Date('2026-10-26T05:40:00Z') })), []);
@@ -60,12 +60,31 @@ test('esti összesítő a holnapi lerakókról; szombaton vasárnap + hétfő', 
   const data = dataOf(trip('A', '2026-10-23'), trip('B', '2026-10-23', { statusz: 'lerakva' }), trip('C', '2026-10-26'), trip('D', '2026-10-25'));
   const thu = computeDue({ data, now: new Date('2026-10-22T15:05:00Z'), sent: { 'reggel:2026-10-22': {} } });
   assert.deepEqual(kinds(thu), ['este:2026-10-22']);
-  assert.match(thu[0].cim, /Ezekre nézz rá holnap \(1\)/);
+  assert.equal(thu[0].cim, 'Holnap: 1 lerakás – ezekre nézz rá');
   // szombat 17:05 nyári idő
   const sat = computeDue({ data, now: new Date('2026-10-24T15:05:00Z'), sent: { 'reggel:2026-10-24': {} } });
-  assert.match(sat[0].cim, /vasárnap és hétfő \(2\)/);
+  assert.equal(sat[0].cim, 'Vasárnap és hétfő: 2 lerakás – ezekre nézz rá');
   // beállítható időpont
   assert.deepEqual(kinds(computeDue({ data, now: new Date('2026-10-22T15:05:00Z'), settings: { estiOsszesito: '18:00' }, sent: { 'reggel:2026-10-22': {} } })), []);
+});
+
+test('összesítők: felrakók és lerakók külön felsorolva', () => {
+  const fel = (id, datum, extra = {}) => trip(id, '2026-10-28', { ...extra,
+    src: { ...trip(id, '2026-10-28').src, felrakas: stop(datum, { varos: 'Győr', ido: '06:00' }) } });
+  const data = dataOf(
+    fel('F1', '2026-10-23'),                       // holnap felrak
+    fel('F2', '2026-10-23', { statusz: 'uton' }),  // már elindult: a felrakása nem teendő
+    trip('L1', '2026-10-23'),                      // holnap lerak
+    fel('F3', '2026-10-22'),                       // ma felrak
+  );
+  const ev = computeDue({ data, now: new Date('2026-10-22T15:05:00Z'), sent: { 'reggel:2026-10-22': {} } })[0];
+  assert.equal(ev.cim, 'Holnap: 1 felrakás, 1 lerakás – ezekre nézz rá');
+  assert.equal(ev.uzenet, 'Felrakás (1):\n• R-F1 – Megbízó F1 – Győr – 06:00\n\nLerakás (1):\n• R-L1 – Megbízó L1 – Wien');
+  const m = computeDue({ data, now: new Date('2026-10-22T05:40:00Z') })[0];
+  assert.match(m.cim, /^Ma: 1 felrakás – /);
+  assert.match(m.uzenet, /^Felrakás \(1\):\n• R-F3/);
+  const none = computeDue({ data: dataOf(), now: new Date('2026-10-22T15:05:00Z'), sent: { 'reggel:2026-10-22': {} } })[0];
+  assert.equal(none.cim, 'Holnap nincs felrakás és lerakás');
 });
 
 test('következő ránézés: lerakott fuvarnál nincs', () => {

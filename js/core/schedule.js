@@ -56,10 +56,11 @@ export function nextReminder(f, sent = {}, now = new Date()) {
 const stopTime = (s) => [s?.ido, s?.idoIg].filter(Boolean).join('–');
 const baseUrl = (appUrl) => (appUrl || '').replace(/[#/]+$/, '');
 
-function line(f, { withDate = false } = {}) {
-  const s = f.src;
-  const when = [withDate ? huDate(s.lerakas.datum) : '', stopTime(s.lerakas)].filter(Boolean).join(' ');
-  const parts = [s.rendszam || s.megbizasszam, s.megbizo, placeText(s.lerakas), when].filter(Boolean);
+/** Egy összesítő-sor; stop: 'felrakas' | 'lerakas' – melyik esemény helyét és idejét mutatja. */
+function line(f, { withDate = false, stop = 'lerakas' } = {}) {
+  const s = f.src, st = s[stop] || {};
+  const when = [withDate ? huDate(st.datum) : '', stopTime(st)].filter(Boolean).join(' ');
+  const parts = [s.rendszam || s.megbizasszam, s.megbizo, placeText(st), when].filter(Boolean);
   return '• ' + parts.join(' – ') + (f.statusz === 'lerakva' ? ' ✓' : f.statusz === 'problema' ? ' ⚠' : '');
 }
 
@@ -67,7 +68,26 @@ function clip(lines, max = 25) {
   return lines.length > max ? [...lines.slice(0, max), `… és még ${lines.length - max}`] : lines;
 }
 
-const sortByTime = (a, b) => (a.src.lerakas.ido || '99').localeCompare(b.src.lerakas.ido || '99');
+const byStop = (stop) => (a, b) => (a.src[stop]?.datum || '').localeCompare(b.src[stop]?.datum || '')
+  || (a.src[stop]?.ido || '99').localeCompare(b.src[stop]?.ido || '99');
+
+/** Felrakók és lerakók adott napokon, külön listában. A már elindult (Úton) vagy lerakott fuvar felrakása nem teendő. */
+function stopsOn(aktiv, days, { skipDone = false } = {}) {
+  const fel = aktiv.filter((f) => days.includes(f.src.felrakas?.datum) && !['uton', 'lerakva'].includes(f.statusz))
+    .sort(byStop('felrakas'));
+  const le = aktiv.filter((f) => days.includes(f.src.lerakas.datum) && !(skipDone && f.statusz === 'lerakva'))
+    .sort(byStop('lerakas'));
+  return { fel, le };
+}
+
+const countText = ({ fel, le }) => [fel.length && `${fel.length} felrakás`, le.length && `${le.length} lerakás`].filter(Boolean).join(', ');
+
+function sections({ fel, le }, withDate) {
+  const out = [];
+  if (fel.length) out.push(`Felrakás (${fel.length}):`, ...clip(fel.map((f) => line(f, { withDate, stop: 'felrakas' }))));
+  if (le.length) out.push(...(out.length ? [''] : []), `Lerakás (${le.length}):`, ...clip(le.map((f) => line(f, { withDate }))));
+  return out;
+}
 
 /** Emlékeztető üzenet. lateFrom: ha késve megy ki, az eredeti időpont jelzése. */
 export function reminderMessage(f, e, appUrl = '', { late = false } = {}) {
@@ -85,33 +105,34 @@ export function reminderMessage(f, e, appUrl = '', { late = false } = {}) {
   };
 }
 
-/** Reggeli összesítő egy adott napra (az akkori állapot szerint). */
+/** Reggeli összesítő egy adott napra: a mai felrakók és lerakók külön, plusz a lejártak. */
 export function morningSummary(data, date, appUrl = '') {
   const aktiv = Object.values(data?.fuvarok || {}).filter((f) => !f.archivalt);
-  const ma = aktiv.filter((f) => f.src.lerakas.datum === date).sort(sortByTime);
+  const ma = stopsOn(aktiv, [date]);
   const lejart = aktiv.filter((f) => f.src.lerakas.datum && f.src.lerakas.datum < date && f.statusz !== 'lerakva');
-  const lines = clip(ma.map((f) => line(f)));
-  if (lejart.length) lines.push('', `Lejárt, de nincs lerakva: ${lejart.length}`, ...clip(lejart.map((f) => line(f, { withDate: true })), 10));
+  const lines = sections(ma, false);
+  if (lejart.length) lines.push(...(lines.length ? [''] : []), `Lejárt, de nincs lerakva (${lejart.length}):`, ...clip(lejart.map((f) => line(f, { withDate: true })), 10));
+  const n = countText(ma);
   return {
     kulcs: `reggel:${date}`, tipus: 'reggeli',
-    cim: ma.length ? `Mai lerakók (${ma.length}) – ${huDateLong(date)}` : `Ma nincs lerakó – ${huDateLong(date)}`,
-    uzenet: lines.join('\n') || 'Nincs mai lerakás.',
+    cim: n ? `Ma: ${n} – ${huDateLong(date)}` : `Ma nincs felrakás és lerakás – ${huDateLong(date)}`,
+    uzenet: lines.join('\n') || 'Nincs mai felrakás és lerakás.',
     link: appUrl ? `${baseUrl(appUrl)}/#/napok` : '',
   };
 }
 
-/** Esti összesítő: a következő napi lerakók (szombaton vasárnap + hétfő, mert vasárnap nincs összesítő). */
+/** Esti összesítő: a következő napi felrakók és lerakók külön (szombaton vasárnap + hétfő, mert vasárnap nincs összesítő). */
 export function eveningSummary(data, date, appUrl = '') {
   const aktiv = Object.values(data?.fuvarok || {}).filter((f) => !f.archivalt);
   const days = [addDays(date, 1)];
   if (weekday(days[0]) === 7) days.push(addDays(date, 2));
-  const holnap = aktiv.filter((f) => days.includes(f.src.lerakas.datum) && f.statusz !== 'lerakva')
-    .sort((a, b) => a.src.lerakas.datum.localeCompare(b.src.lerakas.datum) || sortByTime(a, b));
-  const label = days.length > 1 ? 'vasárnap és hétfő' : 'holnap';
+  const holnap = stopsOn(aktiv, days, { skipDone: true });
+  const label = days.length > 1 ? 'Vasárnap és hétfő' : 'Holnap';
+  const n = countText(holnap);
   return {
     kulcs: `este:${date}`, tipus: 'esti',
-    cim: holnap.length ? `Ezekre nézz rá ${label} (${holnap.length})` : `${label[0].toUpperCase() + label.slice(1)} nincs lerakó`,
-    uzenet: clip(holnap.map((f) => line(f, { withDate: days.length > 1 }))).join('\n') || 'Nincs teendő.',
+    cim: n ? `${label}: ${n} – ezekre nézz rá` : `${label} nincs felrakás és lerakás`,
+    uzenet: sections(holnap, days.length > 1).join('\n') || 'Nincs teendő.',
     link: appUrl ? `${baseUrl(appUrl)}/#/napok` : '',
   };
 }
