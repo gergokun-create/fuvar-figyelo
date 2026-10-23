@@ -97,6 +97,9 @@ input[type=radio], input[type=checkbox] { min-height: 0; width: 18px; height: 18
 .chip { display: inline-block; padding: .1rem .55rem; border-radius: 99px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .s-terv { background: var(--info-soft); color: var(--brand); }
 .s-fel { background: var(--fel-soft); color: var(--fel); }
+.k-fel { background: var(--fel); color: #fff; }
+.k-le { background: var(--brand); color: #fff; }
+.trip .route .focus { font-weight: 700; }
 .s-uton { background: var(--warn-soft); color: var(--warn); }
 .s-le { background: var(--ok-soft); color: var(--ok); }
 .s-prob { background: var(--bad-soft); color: var(--bad); }

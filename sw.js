@@ -1,5 +1,5 @@
 // Service worker: az app héja offline is betölt. A GitHub API-t soha nem gyorsítótárazzuk.
-const VERSION = 'ff-v3';
+const VERSION = 'ff-v4';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/app.js', 'js/store.js', 'js/notify.js', 'js/ui.js', 'js/format.js',
